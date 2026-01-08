@@ -74,7 +74,7 @@ func TestGeneralExecution(t *testing.T) {
 
 func TestValidationIntegration(t *testing.T) {
 	type tValidated struct {
-		Test string `flag:"test" default:"" validate:"nonzero"` //revive:disable-line:struct-tag
+		Test string `flag:"test" default:"" validate:"required"` //revive:disable-line:struct-tag
 	}
 
 	var (
