@@ -1,21 +1,21 @@
 package rconfig
 
 import (
-	"os"
-	"reflect"
-	"testing"
+    "os"
+    "reflect"
+    "testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+    "github.com/stretchr/testify/assert"
+    "github.com/stretchr/testify/require"
 )
 
 func TestVardefaultParsing(t *testing.T) {
-	type test struct {
-		MySecretValue string `default:"secret" env:"foo" vardefault:"my_secret_value"`
-		MyUsername    string `default:"luzifer" vardefault:"username"`
-		SomeVar       string `flag:"var" description:"some variable"`
-		IntVar        int64  `vardefault:"int_var" default:"23"`
-	}
+		type test struct {
+			MySecretValue string `default:"secret" env:"foo" vardefault:"my_secret_value"`
+			MyUsername    string `default:"luzifer" vardefault:"username"`
+			SomeVar       string `flag:"var" description:"some variable"`
+			IntVar        int64  `vardefault:"int_var" default:"23"`
+		}
 
 	var (
 		cfg         test
@@ -83,4 +83,54 @@ func TestVardefaultParsing(t *testing.T) {
 		{&cfg.MyUsername, "luzifer"},
 		{&cfg.SomeVar, ""},
 	})
+}
+
+func TestVarDefaultsFromYAML_Nested(t *testing.T) {
+	yamlData := `
+config:
+  rabbitmq:
+    host: test-host
+    port: 1234
+    vhost: /testvhost
+    client_id: test-client
+  logging:
+    level: debug
+    dir: /tmp/test-logs
+    format: text
+    add_source: false
+`
+	flat := VarDefaultsFromYAML([]byte(yamlData))
+	assert.Equal(t, "test-host", flat["config.rabbitmq.host"])
+	assert.Equal(t, "1234", flat["config.rabbitmq.port"])
+	assert.Equal(t, "/testvhost", flat["config.rabbitmq.vhost"])
+	assert.Equal(t, "test-client", flat["config.rabbitmq.client_id"])
+	assert.Equal(t, "debug", flat["config.logging.level"])
+	assert.Equal(t, "/tmp/test-logs", flat["config.logging.dir"])
+	assert.Equal(t, "text", flat["config.logging.format"])
+	assert.Equal(t, "false", flat["config.logging.add_source"])
+}
+
+func TestVarDefaultsFromYAML_Errors(t *testing.T) {
+	// Empty input should return empty map
+	empty := []byte("")
+	flat := VarDefaultsFromYAML(empty)
+	assert.Empty(t, flat)
+}
+
+func TestVarDefaultsFromYAMLFile_Errors(t *testing.T) {
+	// Non-existent file
+	flat := VarDefaultsFromYAMLFile("/tmp/definitely_not_existing_file_1234567890.yaml")
+	assert.Empty(t, flat)
+}
+
+func TestFlattenYAMLMap_InterfaceKeys(t *testing.T) {
+	// Simulate map[interface{}]interface{} input
+	in := map[string]interface{}{
+		"foo": map[interface{}]interface{}{
+			"bar": 42,
+		},
+	}
+	out := map[string]string{}
+	flattenYAMLMap("", in, out)
+	assert.Equal(t, "42", out["foo.bar"])
 }

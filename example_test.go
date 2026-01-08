@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/Luzifer/rconfig/v2"
+	"github.com/henrix88/rixconfig"
 )
 
 func ExampleParse() {

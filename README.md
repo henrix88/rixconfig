@@ -1,5 +1,5 @@
-[![Go Report Card](https://goreportcard.com/badge/github.com/Luzifer/rconfig)](https://goreportcard.com/report/github.com/Luzifer/rconfig)
-[![Documentation](https://badges.fyi/static/godoc/reference/5272B4)](https://pkg.go.dev/github.com/Luzifer/rconfig/v2)
+[![Go Report Card](https://goreportcard.com/badge/github.com/henrix88/rixconfig)](https://goreportcard.com/report/github.com/henrix88/rixconfig)
+[![Documentation](https://badges.fyi/static/godoc/reference/5272B4)](https://pkg.go.dev/github.com/henrix88/rixconfig)
 ![](https://badges.fyi/github/license/Luzifer/rconfig)
 ![](https://badges.fyi/github/latest-tag/Luzifer/rconfig)
 
@@ -12,7 +12,7 @@
 Install by running:
 
 ```
-go get -u github.com/Luzifer/rconfig/v2
+go get -u github.com/henrix88/rixconfig
 ```
 
 Run tests by running in the checkout folder:
@@ -30,7 +30,7 @@ package main
 
 import (
   "fmt"
-  "github.com/Luzifer/rconfig/v2"
+  "github.com/henrix88/rixconfig"
 )
 
 var (
@@ -78,4 +78,4 @@ func main() {
 
 ## More info
 
-You can see the full reference documentation of the rconfig package [at pkg.go.dev](https://pkg.go.dev/github.com/Luzifer/rconfig/v2)
+You can see the full reference documentation of the rconfig package [at pkg.go.dev](https://pkg.go.dev/github.com/henrix88/rixconfig)

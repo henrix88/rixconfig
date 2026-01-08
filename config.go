@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/spf13/pflag"
-	validator "gopkg.in/validator.v2"
+	validator "github.com/go-playground/validator/v10"
 )
 
 type afterFunc func() error
@@ -108,7 +108,7 @@ func parseAndValidate(in interface{}, args []string) (err error) {
 		return err
 	}
 
-	if err = validator.Validate(in); err != nil {
+	if err = validator.New().Struct(in); err != nil {
 		return fmt.Errorf("validating values: %w", err)
 	}
 
