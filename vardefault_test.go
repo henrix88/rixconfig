@@ -1,21 +1,21 @@
 package rconfig
 
 import (
-    "os"
-    "reflect"
-    "testing"
+	"os"
+	"reflect"
+	"testing"
 
-    "github.com/stretchr/testify/assert"
-    "github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestVardefaultParsing(t *testing.T) {
-		type test struct {
-			MySecretValue string `default:"secret" env:"foo" vardefault:"my_secret_value"`
-			MyUsername    string `default:"luzifer" vardefault:"username"`
-			SomeVar       string `flag:"var" description:"some variable"`
-			IntVar        int64  `vardefault:"int_var" default:"23"`
-		}
+	type test struct {
+		MySecretValue string `default:"secret" env:"foo" vardefault:"my_secret_value"`
+		MyUsername    string `default:"luzifer" vardefault:"username"`
+		SomeVar       string `flag:"var" description:"some variable"`
+		IntVar        int64  `vardefault:"int_var" default:"23"`
+	}
 
 	var (
 		cfg         test
@@ -44,7 +44,10 @@ func TestVardefaultParsing(t *testing.T) {
 		{&cfg.SomeVar, ""},
 	})
 
-	SetVariableDefaults(VarDefaultsFromYAML([]byte("---\nmy_secret_value: veryverysecretkey\nunknownkey: hi there\nint_var: 42\n")))
+	defaults, err := VarDefaultsFromYAML([]byte("---\nmy_secret_value: veryverysecretkey\nunknownkey: hi there\nint_var: 42\n"))
+	require.NoError(t, err)
+	SetVariableDefaults(defaults)
+
 	exec("defaults from YAML data", [][2]interface{}{
 		{&cfg.IntVar, int64(42)},
 		{&cfg.MySecretValue, "veryverysecretkey"},
@@ -60,7 +63,11 @@ func TestVardefaultParsing(t *testing.T) {
 	yamlData := "---\nmy_secret_value: veryverysecretkey\nunknownkey: hi there\nint_var: 42\n"
 	_, err = tmp.WriteString(yamlData)
 	require.NoError(t, err)
-	SetVariableDefaults(VarDefaultsFromYAMLFile(tmp.Name()))
+	
+	defaultsFromFile, err := VarDefaultsFromYAMLFile(tmp.Name())
+	require.NoError(t, err)
+	SetVariableDefaults(defaultsFromFile)
+
 	exec("defaults from YAML file", [][2]interface{}{
 		{&cfg.IntVar, int64(42)},
 		{&cfg.MySecretValue, "veryverysecretkey"},
@@ -68,21 +75,13 @@ func TestVardefaultParsing(t *testing.T) {
 		{&cfg.SomeVar, ""},
 	})
 
-	SetVariableDefaults(VarDefaultsFromYAML([]byte("---\nmy_secret_value = veryverysecretkey\nunknownkey = hi there\nint_var = 42\n")))
-	exec("defaults from invalid YAML data", [][2]interface{}{
-		{&cfg.IntVar, int64(23)},
-		{&cfg.MySecretValue, "secret"},
-		{&cfg.MyUsername, "luzifer"},
-		{&cfg.SomeVar, ""},
-	})
+	// Test invalid YAML data
+	_, err = VarDefaultsFromYAML([]byte("---\nmy_secret_value = veryverysecretkey\nunknownkey = hi there\nint_var = 42\n"))
+	assert.Error(t, err, "should fail on invalid YAML")
 
-	SetVariableDefaults(VarDefaultsFromYAMLFile("/tmp/this_file_should_not_exist_146e26723r"))
-	exec("defaults from non-existing YAML file", [][2]interface{}{
-		{&cfg.IntVar, int64(23)},
-		{&cfg.MySecretValue, "secret"},
-		{&cfg.MyUsername, "luzifer"},
-		{&cfg.SomeVar, ""},
-	})
+	// Test non-existing YAML file
+	_, err = VarDefaultsFromYAMLFile("/tmp/this_file_should_not_exist_146e26723r")
+	assert.Error(t, err, "should fail on missing file")
 }
 
 func TestVarDefaultsFromYAML_Nested(t *testing.T) {
@@ -99,7 +98,9 @@ config:
     format: text
     add_source: false
 `
-	flat := VarDefaultsFromYAML([]byte(yamlData))
+	flat, err := VarDefaultsFromYAML([]byte(yamlData))
+	require.NoError(t, err)
+
 	assert.Equal(t, "test-host", flat["config.rabbitmq.host"])
 	assert.Equal(t, "1234", flat["config.rabbitmq.port"])
 	assert.Equal(t, "/testvhost", flat["config.rabbitmq.vhost"])
@@ -113,24 +114,67 @@ config:
 func TestVarDefaultsFromYAML_Errors(t *testing.T) {
 	// Empty input should return empty map
 	empty := []byte("")
-	flat := VarDefaultsFromYAML(empty)
+	flat, err := VarDefaultsFromYAML(empty)
+	assert.NoError(t, err)
 	assert.Empty(t, flat)
 }
 
 func TestVarDefaultsFromYAMLFile_Errors(t *testing.T) {
 	// Non-existent file
-	flat := VarDefaultsFromYAMLFile("/tmp/definitely_not_existing_file_1234567890.yaml")
-	assert.Empty(t, flat)
+	_, err := VarDefaultsFromYAMLFile("/tmp/definitely_not_existing_file_1234567890.yaml")
+	assert.Error(t, err)
+}
+
+func TestVarDefaultsFromYAML_LowerCase(t *testing.T) {
+	yamlData := `
+Config:
+  RabbitMQ:
+    Host: Test-Host
+`
+	// Without lowercase option
+	flat, err := VarDefaultsFromYAML([]byte(yamlData))
+	require.NoError(t, err)
+	assert.Equal(t, "Test-Host", flat["Config.RabbitMQ.Host"])
+
+	// With lowercase option
+	flat, err = VarDefaultsFromYAML([]byte(yamlData), WithKeyToLower())
+	require.NoError(t, err)
+	assert.Equal(t, "Test-Host", flat["config.rabbitmq.host"])
 }
 
 func TestFlattenYAMLMap_InterfaceKeys(t *testing.T) {
 	// Simulate map[interface{}]interface{} input
+	// Since flattenYAMLMap is private, we can't call it directly easily unless we export it
+	// or use a helper that calls it.
+	// But VarDefaultsFromYAML calls it.
+	// However, VarDefaultsFromYAML now unmarshals to map[string]interface{}.
+	// We can rely on Unmarshal behavior or trust internal logic.
+	// But `flattenYAMLMap` handles map[interface{}]interface{} case just in case.
+	// We can manually trigger it if we can construct such input to VarDefaultsFromYAML?
+	// Usually strict parsers produce string keys.
+	// We can skip this test or reflect it if really needed, but it was testing internal logic.
+	// Since we redefined flattenYAMLMap in the same file, we can test it if we can access it within `package rconfig`.
+	// Yes, unit tests are in `package rconfig`.
+	
 	in := map[string]interface{}{
 		"foo": map[interface{}]interface{}{
 			"bar": 42,
 		},
 	}
 	out := map[string]string{}
-	flattenYAMLMap("", in, out)
+	opts := &YAMLOptions{}
+	flattenYAMLMap("", in, out, opts)
 	assert.Equal(t, "42", out["foo.bar"])
+}
+
+func TestVarDefaultsFromYAML_SliceRoot(t *testing.T) {
+	// YAML root is a list
+	yamlData := `
+- item1
+- item2
+`
+	_, err := VarDefaultsFromYAML([]byte(yamlData))
+	assert.Error(t, err)
+	// Check that it fails with parsing error
+	assert.Contains(t, err.Error(), "parsing yaml")
 }
